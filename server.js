@@ -30,10 +30,46 @@ dotenv.config();
 // Initialize Express app
 const app = express();
 
+// MongoDB connection with reuse and timeout
+let cachedConnection = null;
+
+async function connectToDatabase() {
+  if (cachedConnection && cachedConnection.connection.readyState === 1) {
+    console.log('Reusing existing MongoDB connection');
+    return cachedConnection;
+  }
+
+  try {
+    const startTime = Date.now();
+    cachedConnection = await mongoose.connect(process.env.MONGO_URI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+      serverSelectionTimeoutMS: 5000, // 5-second timeout
+      connectTimeoutMS: 5000, // 5-second timeout
+    });
+    console.log(`MongoDB connected in ${Date.now() - startTime}ms`);
+    return cachedConnection;
+  } catch (err) {
+    console.error('MongoDB connection error:', err.message);
+    throw err; // Let Vercel log the error
+  }
+}
+
+// Establish connection at startup (cold start)
+connectToDatabase().catch(err => {
+  console.error('Failed to connect to MongoDB at startup:', err);
+  process.exit(1);
+});
+
 // Middleware
 app.use(cors({ origin: ['https://your-frontend.vercel.app', 'http://localhost:3000'] }));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
+
+// Health check route for debugging
+app.get('/health', (req, res) => {
+  res.status(200).send('API is working!');
+});
 
 // Routes
 app.use('/api/avocats', avocatRoutes);
@@ -58,37 +94,5 @@ app.use('/api/admin', adminRoutes);
 
 app.use(errorHandler);
 
-// MongoDB connection with reuse for serverless
-let cachedConnection = null;
-
-async function connectToDatabase() {
-  if (cachedConnection && cachedConnection.connection.readyState === 1) {
-    console.log('Reusing existing MongoDB connection');
-    return cachedConnection;
-  }
-
-  try {
-    cachedConnection = await mongoose.connect(process.env.MONGO_URI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
-    console.log('MongoDB connected');
-    return cachedConnection;
-  } catch (err) {
-    console.error('MongoDB connection error:', err.message);
-    throw err; // Let Vercel log the error
-  }
-}
-
-connectToDatabase().catch(err => {
-  console.error('Failed to connect to MongoDB:', err);
-  process.exit(1);
-});
-
-// Health check route for debugging
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'OK', message: 'Server is running' });
-});
-
 // Export for serverless
-module.exports = app; 
+module.exports.handler = serverless(app);

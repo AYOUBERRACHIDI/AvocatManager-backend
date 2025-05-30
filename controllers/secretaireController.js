@@ -1,5 +1,5 @@
 const Secretaire = require('../models/Secretaire');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 
 exports.getAllSecretaires = async (req, res) => {
   try {
