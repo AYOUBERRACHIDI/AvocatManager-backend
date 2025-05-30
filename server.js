@@ -5,8 +5,7 @@ const bodyParser = require('body-parser');
 const jwt = require('jsonwebtoken');
 const dotenv = require('dotenv');
 const nodemailer = require('nodemailer');
-const path = require('path');
-const serverless = require('serverless-http');
+const path = require('path'); 
 
 const authRoutes = require('./routes/authRoutes');
 const avocatRoutes = require('./routes/avocatRoutes');
@@ -23,64 +22,18 @@ const consultationRoutes = require('./routes/consultationRoutes');
 const rendezVousRoutes = require('./routes/rendezVousRoutes');
 const paiementRoutes = require('./routes/paiementRoutes');
 const transactionPaiementRoutes = require('./routes/transactionPaiementRoutes');
+
 const adminRoutes = require('./routes/adminRoutes');
+
 
 dotenv.config();
 
-// Initialize Express app
 const app = express();
+const port = process.env.PORT || 5000;
 
-// MongoDB connection with reuse and timeout
-let cachedConnection = null;
-
-async function connectToDatabase() {
-  if (cachedConnection && cachedConnection.connection.readyState === 1) {
-    console.log('Reusing existing MongoDB connection');
-    return cachedConnection;
-  }
-
-  try {
-    const startTime = Date.now();
-    cachedConnection = await mongoose.connect(process.env.MONGO_URI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-      serverSelectionTimeoutMS: 3000, // Reduce to 3 seconds
-      connectTimeoutMS: 3000, // Reduce to 3 seconds
-    });
-    console.log(`MongoDB connected in ${Date.now() - startTime}ms`);
-    return cachedConnection;
-  } catch (err) {
-    console.error('MongoDB connection error:', err.message);
-    throw err;
-  }
-}
-
-// Establish connection at startup (cold start)
-connectToDatabase().catch(err => {
-  console.error('Failed to connect to MongoDB at startup:', err);
-  process.exit(1);
-});
-
-// Middleware
-app.use(cors({ origin: ['https://your-frontend.vercel.app', 'http://localhost:3000'] }));
+app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
-
-// Health check route with timing
-app.get('/health', (req, res) => {
-  const startTime = Date.now();
-  res.status(200).send('API is working!');
-  console.log(`/health route took ${Date.now() - startTime}ms`);
-});
-
-// Routes with timing middleware
-app.use((req, res, next) => {
-  const startTime = Date.now();
-  res.on('finish', () => {
-    console.log(`${req.method} ${req.path} took ${Date.now() - startTime}ms`);
-  });
-  next();
-});
 
 app.use('/api/avocats', avocatRoutes);
 app.use('/api/clients', clientRoutes);
@@ -96,13 +49,32 @@ app.use('/api/sessions', sessionRoutes);
 app.use('/api/affaire-clients', affaireClientRoutes);
 app.use('/api/affaire-adversaires', affaireAdversaireRoutes);
 app.use('/api/types', typeRoutes);
+
 app.use('/api/admin', adminRoutes);
 
-// Comment out static file serving until migrated to Cloudinary/S3
-// app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-// app.use('/public', express.static(path.join(__dirname, 'public')));
+
+
+
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/public', express.static(path.join(__dirname, 'public')));
+
 
 app.use(errorHandler);
 
-// Export for serverless
-module.exports.handler = serverless(app);
+mongoose.connect(process.env.MONGO_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true
+})
+  .then(() => console.log('MongoDB connected'))
+  .catch(err => {
+    console.error('MongoDB connection error:', err.message);
+    process.exit(1);
+  });
+
+// app.listen(port, () => {
+//   console.log(`Server running on port ${port}`);
+// });
+
+app.listen(port, '0.0.0.0', () => {
+  console.log(`Server running on http://0.0.0.0:${port}`);
+});
