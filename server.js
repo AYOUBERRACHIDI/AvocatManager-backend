@@ -44,14 +44,14 @@ async function connectToDatabase() {
     cachedConnection = await mongoose.connect(process.env.MONGO_URI, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
-      serverSelectionTimeoutMS: 5000, // 5-second timeout
-      connectTimeoutMS: 5000, // 5-second timeout
+      serverSelectionTimeoutMS: 3000, // Reduce to 3 seconds
+      connectTimeoutMS: 3000, // Reduce to 3 seconds
     });
     console.log(`MongoDB connected in ${Date.now() - startTime}ms`);
     return cachedConnection;
   } catch (err) {
     console.error('MongoDB connection error:', err.message);
-    throw err; // Let Vercel log the error
+    throw err;
   }
 }
 
@@ -66,12 +66,22 @@ app.use(cors({ origin: ['https://your-frontend.vercel.app', 'http://localhost:30
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// Health check route for debugging
+// Health check route with timing
 app.get('/health', (req, res) => {
+  const startTime = Date.now();
   res.status(200).send('API is working!');
+  console.log(`/health route took ${Date.now() - startTime}ms`);
 });
 
-// Routes
+// Routes with timing middleware
+app.use((req, res, next) => {
+  const startTime = Date.now();
+  res.on('finish', () => {
+    console.log(`${req.method} ${req.path} took ${Date.now() - startTime}ms`);
+  });
+  next();
+});
+
 app.use('/api/avocats', avocatRoutes);
 app.use('/api/clients', clientRoutes);
 app.use('/api/secretaires', secretaireRoutes);
