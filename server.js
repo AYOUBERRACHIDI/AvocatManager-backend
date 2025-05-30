@@ -5,9 +5,8 @@ const bodyParser = require('body-parser');
 const jwt = require('jsonwebtoken');
 const dotenv = require('dotenv');
 const nodemailer = require('nodemailer');
-const path = require('path'); 
+const path = require('path');
 const serverless = require('serverless-http');
-
 
 const authRoutes = require('./routes/authRoutes');
 const avocatRoutes = require('./routes/avocatRoutes');
@@ -24,19 +23,19 @@ const consultationRoutes = require('./routes/consultationRoutes');
 const rendezVousRoutes = require('./routes/rendezVousRoutes');
 const paiementRoutes = require('./routes/paiementRoutes');
 const transactionPaiementRoutes = require('./routes/transactionPaiementRoutes');
-
 const adminRoutes = require('./routes/adminRoutes');
-
 
 dotenv.config();
 
+// Initialize Express app
 const app = express();
-const port = process.env.PORT || 5000;
 
-app.use(cors());
+// Middleware
+app.use(cors({ origin: ['https://your-frontend.vercel.app', 'http://localhost:3000'] }));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
+// Routes
 app.use('/api/avocats', avocatRoutes);
 app.use('/api/clients', clientRoutes);
 app.use('/api/secretaires', secretaireRoutes);
@@ -51,35 +50,45 @@ app.use('/api/sessions', sessionRoutes);
 app.use('/api/affaire-clients', affaireClientRoutes);
 app.use('/api/affaire-adversaires', affaireAdversaireRoutes);
 app.use('/api/types', typeRoutes);
-
 app.use('/api/admin', adminRoutes);
 
-
-
-
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-app.use('/public', express.static(path.join(__dirname, 'public')));
-
+// Comment out static file serving until migrated to Cloudinary/S3
+// app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// app.use('/public', express.static(path.join(__dirname, 'public')));
 
 app.use(errorHandler);
 
-mongoose.connect(process.env.MONGO_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-})
-  .then(() => console.log('MongoDB connected'))
-  .catch(err => {
+// MongoDB connection with reuse for serverless
+let cachedConnection = null;
+
+async function connectToDatabase() {
+  if (cachedConnection && cachedConnection.connection.readyState === 1) {
+    console.log('Reusing existing MongoDB connection');
+    return cachedConnection;
+  }
+
+  try {
+    cachedConnection = await mongoose.connect(process.env.MONGO_URI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
+    console.log('MongoDB connected');
+    return cachedConnection;
+  } catch (err) {
     console.error('MongoDB connection error:', err.message);
-    process.exit(1);
-  });
+    throw err; // Let Vercel log the error
+  }
+}
 
-// app.listen(port, () => {
-//   console.log(`Server running on port ${port}`);
-// });
+connectToDatabase().catch(err => {
+  console.error('Failed to connect to MongoDB:', err);
+  process.exit(1);
+});
 
-// app.listen(port, '0.0.0.0', () => {
-//   console.log(`Server running on http://0.0.0.0:${port}`);
-// });
+// Health check route for debugging
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'OK', message: 'Server is running' });
+});
 
-module.exports = app;
+// Export for serverless
 module.exports.handler = serverless(app);
