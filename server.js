@@ -91,4 +91,4 @@ app.get('/health', (req, res) => {
 });
 
 // Export for serverless
-module.exports.handler = serverless(app);
+module.exports = app; 
