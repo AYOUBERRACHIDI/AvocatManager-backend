@@ -1,0 +1,164 @@
+classDiagram
+    direction TB
+
+    %% Gestion des utilisateurs
+    class Utilisateur {
+        +String nom [req]
+        +String prenom [req]
+        +String email [req, uniq]
+        +String password [req]
+        +String telephone [req]
+        +String adresse [req]
+        +String ville [req]
+    }
+
+    class Avocat {
+        +String logo
+        +String specialiteJuridique
+        +String nomCabinet
+        +comparePassword(): Boolean
+    }
+
+    class Secretaire {
+        +ObjectId avocat_id [req]
+        +Date createdAt [ts]
+        +Date updatedAt [ts]
+    }
+
+    %% Gestion des affaires
+    class Client {
+        +String nom [req]
+        +String CIN [req, uniq]
+        +String telephone_1 [req]
+        +String telephone_2
+        +String adresse_1 [req]
+        +String adresse_2
+        +ObjectId avocat_id [req]
+        +ObjectId[] affaires
+    }
+
+    class Affaire {
+        +String case_number
+        +String client_role [req]
+        +String statut [def: 'en cours']
+        +String category [req]
+        +String type [req]
+        +ObjectId avocat_id [req]
+        +ObjectId client_id [req]
+        +String adversaire [req]
+        +String case_level [req, def: 'primary']
+        +String primary_case_number
+        +String fee_type [req]
+        +Number lawyer_fees [req, min: 0]
+        +Number case_expenses
+        +String[] attachments [def: []]
+        +Boolean isArchived [def: false]
+        +Date archivedAt
+        +String archiveRemarks
+        +Date date_creation [def: Date.now]
+        +Number total_paid_amount [virt]
+    }
+
+    class Adversaire {
+        +String nom [req]
+        +String CIN [req, uniq]
+        +String telephone [req]
+        +String adresse [req]
+    }
+
+    %% Finances et planification
+    class Paiement {
+        +Number montant_total [req, min: 0]
+        +Number paid_amount [req, min: 0]
+        +String mode_paiement [req]
+        +Date date_creation [def: Date.now]
+        +String statut [def: 'en attente']
+        +String description
+        +ObjectId client_id [req]
+        +ObjectId avocat_id [req]
+        +ObjectId affaire_id
+        +ObjectId consultation_id
+    }
+
+    class Consultation {
+        +Date date [req]
+        +String heure_debut [req]
+        +String heure_fin [req]
+        +String status [def: 'pending']
+        +ObjectId avocat_id [req]
+        +ObjectId client_id [req]
+        +ObjectId affaire_id
+        +String notes
+        +Number montant
+        +String mode_paiement
+        +Date createdAt [ts]
+        +Date updatedAt [ts]
+    }
+
+    class RendezVous {
+        +String description [req]
+        +String aff
+        +Date date [req]
+        +String heure_debut [req]
+        +String heure_fin [req]
+        +String status [def: 'pending']
+        +ObjectId avocat_id [req]
+        +ObjectId client_id [req]
+        +ObjectId affaire_id
+        +String notes [def: '']
+        +Object recurrence
+    }
+
+    class Session {
+        +String emplacement [req]
+        +Date date [req]
+        +String heure_debut [req]
+        +String heure_fin [req]
+        +String status [def: 'pending']
+        +ObjectId avocat_id [req]
+        +ObjectId client_id [req]
+        +ObjectId rendez_vous_id
+        +ObjectId affaire_id
+        +String case_number [def: '']
+        +String remarque [def: '']
+        +Number ordre [req]
+        +String gouvernance [def: '']
+    }
+
+    %% Relations avec verbes en français
+    %% Generalisation
+    Avocat --|> Utilisateur
+    Secretaire --|> Utilisateur
+
+    %% Associations
+    Avocat "1" --> "0..*" Secretaire : emploie
+    Avocat "1" --> "0..*" Client : représente
+    Avocat "1" --> "0..*" Affaire : gère
+    Avocat "1" --> "0..*" Consultation : mène
+    Avocat "1" --> "0..*" RendezVous : planifie
+    Avocat "1" --> "0..*" Session : participe
+    Client "1" --> "0..*" Consultation : demande
+    Client "1" --> "0..*" RendezVous : réserve
+    Client "1" --> "0..*" Session : participe
+    Consultation "0..1" --> "1" Affaire : concerne
+    RendezVous "0..1" --> "1" Affaire : lie
+    Session "0..1" --> "1" Affaire : concerne
+    Session "0..1" --> "1" RendezVous : suit
+    Paiement "1" --> "1" Avocat : concerne
+    Paiement "1" --> "1" Client : concerne
+
+    %% Many-to-Many Association
+    Client "0..*" -- "0..*" Affaire : impliqué_dans
+
+    %% Composition
+    Affaire "1" *-- "0..*" Paiement : contient
+    Consultation "1" *-- "0..*" Paiement : contient
+
+    %% Aggregation
+    Affaire "1" o-- "0..*" RendezVous : agrège
+    Affaire "1" o-- "0..*" Session : agrège
+
+    %% Dépendance
+    Affaire ..> Paiement : calcule_total
+    Affaire ..> Adversaire : référence
+
